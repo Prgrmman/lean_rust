@@ -1,1 +1,4 @@
 # I'll figure out what to ignore as I progress
+*.o
+*.bin
+*/target/

@@ -1,98 +1,64 @@
-use std::mem;
-// mark the List as public so that others can use it, but as a struct to hide implementation
-// details.
-// Structs with one element are the same size as that element: a zero-cost abstraction.
+/* NOTE: code was initially copied from first.rs */
+
 pub struct List {
     head: Link,
 }
 
-// link is used to chain elements together
-// This used the null pointer optimization, because there is no need to store the 'Empty' tag (can
-// be all 0s)
-enum Link {
-    Empty,
-    More(Box<Node>),
-}
+// type alias Link
+// the old version of Link is now reimplemented using Option
+type Link = Option<Box<Node>>;
 
 struct Node {
     elem: i32,
     next: Link,
 }
 
-/* Multiline comment cool
- * Now we need to specify an implementation for our List
- * "impl" blocks associate code with a type
- * A normal function inside of an "impl" block is a static method
- *
- * Methods are a special type of function in rust because of the "self" arg
- *
- * There are three primary forms of ownership in Rust:
- *  - self: Value
- *  - &mut self: mutable reference
- *      Gotcha: you can't remove a value without replacement
- *  - &self: shared reference
- */
 impl List {
-    pub fn new() -> Self { // "Self" is an alias to List
-        List { head: Link::Empty} // implicit return as last expression
+    pub fn new() -> Self {
+        List { head: None}
     }
     /* push element to front of the list. */
     pub fn push(&mut self, elem: i32) { // I suppose this function does not return anything
 
-        /* The code does not work because of exception safety.
-         * One would think that we could move an element out of List as long as we replace it
-         * later. However, if an exception occurred, and the code unwrapped, we need some guarantee
-         * that memory will be valid there. This is why we must use mem::replace. */
-        //let new_node = Box::new(Node {
-        //    elem: elem,
-        //    next: self.head,
-        //});
-        //self.head = Link::More(new_node);
         let new_node = Box::new(Node {
             elem: elem,
-            next: mem::replace(&mut self.head, Link::Empty), // temporarily replace head of the list with Empty and assign next to the previous head.
+            next: self.head.take(),
         });
-        self.head = Link::More(new_node);
+        self.head = Some(new_node);
     }
     /* remove element from the front of the list.
      * Option represents a type that might be Some<T> or None. */
     pub fn pop(&mut self) -> Option<i32> {
-        let result;
-        /* An example of enum pattern matching! */
-        /* we have to do the replace trick because we can't move values
-         * out of shared references without replacing them. */
-        match mem::replace(&mut self.head, Link::Empty) {
-            Link::Empty => {
-            result = None;
-            }
-            Link::More(node) => {
-                result = Some(node.elem);
-                self.head = node.next;
-            }
-        };
-        result
+        //match self.head.take() {
+        //    None => None,
+        //    Some(node) => {
+        //        self.head = node.next;
+        //        Some(node.elem)
+        //    }
+        //}
+        /* This particular match idiom is so common, that Option
+         * does it with a method called "map". It will apply a function to
+         * a value wrapped in Option, otherwise it will return None.
+         * Below, we take advantage of a closure.
+         * I'm going to assume that the type of node is a non mutable value,
+         * where ownership is transferred into the closure block.
+         * The last expression "node.elem" moves ownership back out of the closure (I think)
+         */
+        self.head.take().map(|node| {
+            self.head = node.next;
+            node.elem
+        })
     }
 }
 
-/* The guide claims that the default destructor for our linked list would be recursive
- * and that recursion would be unbounded. This is why we explicitly implement the Drop
- * trait for our list. */
 impl Drop for List {
     fn drop(&mut self) {
-        let mut cur_link = mem::replace(&mut self.head, Link::Empty);
+        /* notice the take method: this is method from Option, that implements the idiom
+         * mem::replace(&mut option, None) */
+        let mut cur_link = self.head.take();
 
-        /* "while let" is a form of pattern matching.
-         * It means "do this thing while this pattern matches" */
-        while let Link::More(mut boxed_node) = cur_link {
-            /* These next few lines are pretty clever.
-             * The pattern matching statement above moves ownership of the boxed_node
-             * into the body of the while loop. The Link stored in boxed_node.next is then replaced
-             * with an empty link (Link::Empty), and that value is now assigned to cur_link.
-             * So boxed_node will go out of scope, be dropped, and therefore cleaned up.
-             * This eliminates unbounded recursion. This is the reason why we have to set
-             * boxed_node.next to Link::Empty, so it doesn't recurse down the list
-             */
-            cur_link = mem::replace(&mut boxed_node.next, Link::Empty);
+        while let Some(mut boxed_node) = cur_link {
+            cur_link = boxed_node.next.take();
         }
 
     }

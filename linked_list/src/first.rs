@@ -69,7 +69,8 @@ impl List {
                 /* It should be noted that the compiler is doing something tricky here,
                  * known as Deref coercion. Basically, if a type U implements Deref<Target=T>,
                  * then values of &U will automatically be coerced to &T. So in this case, 
-                 * the compiler is actually coercing Box<Option<i32>> into Option<i32>! */
+                 * the compiler is actually coercing Box<Node> into Node so we can access the elem
+                 * field */
                 result = Some(node.elem);
                 self.head = node.next;
             }

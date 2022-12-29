@@ -1,6 +1,3 @@
-use std::mem;
-
-
 pub struct List {
     head: Link,
 }
@@ -53,13 +50,19 @@ impl List {
     //    result
     //}
     pub fn pop(&mut self) -> Option<i32> {
-        match self.head.take() { // here we have replaced the mem::replace function with "take"
-            None => None,
-            Some(node) => {
-                self.head = node.next;
-                Some(node.elem)
-            }
-        }
+        //match self.head.take() { // here we have replaced the mem::replace function with "take"
+        //    None => None,
+        //    Some(node) => {
+        //        self.head = node.next;
+        //        Some(node.elem)
+        //    }
+        //}
+        // Replace the above with the map idiom, which takes a function and makes a closure
+        // TODO: probably will need more study of Rust-style closures...
+        self.head.take().map(|node| {
+            self.head = node.next;
+            node.elem
+        })
     }
 }
 

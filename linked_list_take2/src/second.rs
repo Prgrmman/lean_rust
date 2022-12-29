@@ -1,5 +1,5 @@
-pub struct List {
-    head: Link,
+pub struct List<T> {
+    head: Link<T>,
 }
 
 // This form is special:
@@ -11,21 +11,21 @@ pub struct List {
 //    More(Box<Node>),
 //}
 // Here we change Link to be a type alias of Option
-type Link = Option<Box<Node>>;
+type Link<T> = Option<Box<Node<T>>>;
 
-struct Node {
-    elem: i32,
-    next: Link,
+struct Node<T> {
+    elem: T,
+    next: Link<T>,
 }
 
 // "impl" associates code with a type
 // "Self" is an alias of the type
-impl List {
+impl<T> List<T> {
     pub fn new() -> Self {
         List {head: None}
     }
 
-    pub fn push(&mut self, elem: i32) {
+    pub fn push(&mut self, elem: T) {
         let new_node = Box::new(Node {
             elem: elem,
             next: self.head.take(),
@@ -49,7 +49,7 @@ impl List {
     //    //unimplemented!()
     //    result
     //}
-    pub fn pop(&mut self) -> Option<i32> {
+    pub fn pop(&mut self) -> Option<T> {
         //match self.head.take() { // here we have replaced the mem::replace function with "take"
         //    None => None,
         //    Some(node) => {
@@ -69,7 +69,7 @@ impl List {
 // some notes on the drop trait
 // - it's like a destructor in C++
 
-impl Drop for List {
+impl<T> Drop for List<T> {
     fn drop(&mut self) {
         let mut cur_link = self.head.take();
         // `while let` == "do this thing until this pattern doesn't match"
@@ -90,6 +90,8 @@ mod test {
     use super::List; // you have to pull this module in explicitly
     #[test]
     fn basic() {
+        // This line is pretty cool:
+        // Rust figures out the type of list based on the arguments I pass it later down
         let mut list = List::new();
 
         // check empty list

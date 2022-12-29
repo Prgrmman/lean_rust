@@ -60,3 +60,54 @@ impl List {
         }
     }
 }
+
+// some notes on the drop trait
+// - it's like a destructor in C++
+
+impl Drop for List {
+    fn drop(&mut self) {
+        let mut cur_link = mem::replace(&mut self.head, Link::Empty);
+        // `while let` == "do this thing until this pattern doesn't match"
+        while let Link::More(mut boxed_node) = cur_link {
+            cur_link = mem::replace(&mut boxed_node.next, Link::Empty);
+            // boxed_node goes out of scope and gets dropped here;
+            // but its Node's `next` field has been set to Link::Empty
+            // so no unbounded recursion occurs.
+        }
+    }
+}
+
+
+// this cfg line means only be used if we are compiling for tests
+#[cfg(test)]
+mod test {
+    use super::List; // you have to pull this module in explicitly
+    #[test]
+    fn basic() {
+        let mut list = List::new();
+
+        // check empty list
+        assert_eq!(list.pop(), None);
+
+        list.push(1);
+        list.push(2);
+        list.push(3);
+
+        // check removal of items
+        assert_eq!(list.pop(), Some(3));
+        assert_eq!(list.pop(), Some(2));
+
+        // push some more elements (make sure no memory corruption)
+        list.push(4);
+        list.push(5);
+
+        // Check removal one more time
+        assert_eq!(list.pop(), Some(5));
+        assert_eq!(list.pop(), Some(4));
+
+        // check exhaustion (removal till empty)
+        assert_eq!(list.pop(), Some(1));
+        assert_eq!(list.pop(), None);
+
+    }
+}

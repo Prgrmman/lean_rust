@@ -64,6 +64,17 @@ impl<T> List<T> {
             node.elem
         })
     }
+    pub fn peek(&self) -> Option<&T> {
+        self.head.as_ref().map(|node| {
+            &node.elem
+        })
+    }
+
+    pub fn peek_mut(&mut self) -> Option<&mut T> {
+        self.head.as_mut().map(|node| {
+            &mut node.elem
+        })
+    }
 }
 
 // some notes on the drop trait
@@ -83,6 +94,67 @@ impl<T> Drop for List<T> {
     }
 }
 
+// Tuple structs are an alternative form of struct,
+// useful for trivial wrappers around other types.
+pub struct IntoIter<T>(List<T>);
+
+// All collection types should implement that following itertors:
+// - IntoIter - T
+// - IterMut - &mut T
+// - Iter - &T
+impl<T> List<T> {
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIter(self)
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        // access fields of a tuple struct numerically
+        self.0.pop()
+    }
+}
+
+
+/* This one is more fun (Also found multi line comments)
+We need to hold a pointer to the next element.
+However, we need to use the option type because the list may be empty,
+or we may be done iterating
+*/
+pub struct Iter<'a, T> {
+    next: Option<&'a Node<T>>,
+}
+
+// No lifetime here, List doesn't have any associated lifetimes
+//impl<T> List<T> {
+    //// We declare a fresh lifetime here for the *exact* borrow that
+    //// creates the iter. Now &self needs to be valid as long as the
+    //// Iter is around.
+    //// as deref will dereference our box type and rewrap as an Option type again
+    //pub fn iter<'a>(&'a self) -> Iter<'a, T> {
+        //Iter { next: self.head.as_deref() }
+    //}
+//}
+// Same as above, but with lieftime ellision
+impl<T> List<T> {
+    pub fn iter(&self) -> Iter<T> {
+        Iter { next: self.head.as_deref() }
+    }
+}
+
+// We *do* have a lifetime here, because Iter has one that we need to define
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+    // None of this needs to change, handled by the above.
+    // Self continues to be incredibly hype and amazing
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.map(|node| {
+            self.next = node.next.as_deref();
+            &node.elem
+        })
+    }
+}
 
 // this cfg line means only be used if we are compiling for tests
 #[cfg(test)]
@@ -117,5 +189,51 @@ mod test {
         assert_eq!(list.pop(), Some(1));
         assert_eq!(list.pop(), None);
 
+    }
+
+    #[test]
+    fn peek() {
+        let mut list = List::new();
+        assert_eq!(list.peek(), None);
+        list.push(1); list.push(2); list.push(3);
+
+        // Odd that we can pass a mutable reference to a literal...
+        assert_eq!(list.peek(), Some(&3));
+        assert_eq!(list.peek_mut(), Some(&mut 3));
+        // Originally had the line list.peek_mut().map(|&mut value| {
+        // however this line is wrong:
+        // |&mut value| means "the argument is a mutable reference, but just copy the value it points to into value, please." 
+        // instead, we use just |value| and the original type is preserved
+        list.peek_mut().map(|value| {
+            *value = 42
+        });
+    
+        assert_eq!(list.peek(), Some(&42));
+        assert_eq!(list.pop(), Some(42));
+    }
+
+    #[test]
+    fn into_iter() {
+        let mut list = List::new();
+        list.push(1); list.push(2); list.push(3);
+        
+        let mut iter = list.into_iter();
+        // list.peek(); this call is illegal!
+        // it doesn't work because by creating an iterator type, we move list into the iterator!
+        assert_eq!(iter.next(), Some(3));
+        assert_eq!(iter.next(), Some(2));
+        assert_eq!(iter.next(), Some(1));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn iter() {
+        let mut list = List::new();
+        list.push(1); list.push(2); list.push(3);
+
+        let mut iter = list.iter();
+        assert_eq!(iter.next(), Some(&3));
+        assert_eq!(iter.next(), Some(&2));
+        assert_eq!(iter.next(), Some(&1));
     }
 }
